@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: pcg-personnel-api
+    runtime: node
+    buildCommand: npm install && npm run build --workspace=server
+    startCommand: node server/dist/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        value: https://personnel-management-sys-b9278.web.app
+      - key: JWT_EXPIRE
+        value: 24h
+      - key: FIREBASE_PROJECT_ID
+        value: personnel-management-sys-b9278
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: JWT_SECRET
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
