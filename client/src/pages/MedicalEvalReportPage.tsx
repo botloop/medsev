@@ -274,7 +274,7 @@ export const MedicalEvalReportPage = () => {
     const allRows = [...dbRows, ...manualRows];
     const colWidths = [70, 60, 75, 65, 55, 90, 75, 90, 40, 55, 90, 90, 130, 130];
     const thStyle = 'border:1px solid #999;padding:6px 8px;background:#f0f0f0;font-weight:bold;color:#1565c0;text-align:center;white-space:pre-line;vertical-align:middle;font-size:11pt;';
-    const tdStyle = (center = false) => `border:1px solid #ccc;padding:4px 8px;font-size:11pt;${center ? 'text-align:center;' : ''}`;
+    const tdStyle = (_center = false) => `border:1px solid #ccc;padding:4px 8px;font-size:11pt;text-align:center;`;
     const centerCols = new Set([0,1,2,3,6,8,9,10,11]);
     const html = `
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
