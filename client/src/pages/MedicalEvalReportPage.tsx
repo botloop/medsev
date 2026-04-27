@@ -272,8 +272,9 @@ export const MedicalEvalReportPage = () => {
       e.age, e.gender, e.purpose, e.physProfile, doctor, releasingOfficer
     ]);
     const allRows = [...dbRows, ...manualRows];
-    const thStyle = 'border:1px solid #999;padding:4px 6px;background:#f0f0f0;font-weight:bold;color:#1565c0;text-align:center;white-space:pre-line;vertical-align:middle;';
-    const tdStyle = (center = false) => `border:1px solid #ccc;padding:3px 6px;${center ? 'text-align:center;' : ''}`;
+    const colWidths = [70, 60, 75, 65, 55, 90, 75, 90, 40, 55, 90, 90, 130, 130];
+    const thStyle = 'border:1px solid #999;padding:6px 8px;background:#f0f0f0;font-weight:bold;color:#1565c0;text-align:center;white-space:pre-line;vertical-align:middle;font-size:11pt;';
+    const tdStyle = (center = false) => `border:1px solid #ccc;padding:4px 8px;font-size:11pt;${center ? 'text-align:center;' : ''}`;
     const centerCols = new Set([0,1,2,3,6,8,9,10,11]);
     const html = `
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -282,13 +283,14 @@ export const MedicalEvalReportPage = () => {
 <x:Name>MedEval</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
 </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
 </head><body>
-<table style="border-collapse:collapse;font-family:Arial;font-size:11px;">
-  <tr><td colspan="${headers.length}" style="font-weight:bold;font-size:13px;">DATABASE MANAGEMENT - PCG Personnel Database</td></tr>
-  <tr><td colspan="${headers.length}" style="color:#1565c0;font-size:11px;">Format for the List of Medical Evaluation Report</td></tr>
-  <tr><td colspan="${headers.length}"></td></tr>
+<table style="border-collapse:collapse;font-family:Arial;font-size:11pt;">
+  <colgroup>${colWidths.map(w => `<col style="width:${w}pt;">`).join('')}</colgroup>
+  <tr><td colspan="${headers.length}" style="font-weight:bold;font-size:14pt;padding:6px 8px;">DATABASE MANAGEMENT - PCG Personnel Database</td></tr>
+  <tr><td colspan="${headers.length}" style="color:#1565c0;font-size:12pt;padding:4px 8px;">Format for the List of Medical Evaluation Report</td></tr>
+  <tr><td colspan="${headers.length}" style="padding:4px;"></td></tr>
   <tr>${headers.map(h => `<th style="${thStyle}">${h.replace('\n','<br>')}</th>`).join('')}</tr>
   ${allRows.map((row, ri) => `<tr style="background:${ri % 2 === 0 ? '#fff' : '#fafafa'};">${
-    row.map((v, ci) => `<td style="${tdStyle(centerCols.has(ci))}" x:str="${v}">${v}</td>`).join('')
+    row.map((v, ci) => `<td style="${tdStyle(centerCols.has(ci))}" x:str="${String(v)}">${v}</td>`).join('')
   }</tr>`).join('')}
 </table></body></html>`;
     const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
