@@ -22,6 +22,7 @@ const allowedOrigins: (string | RegExp)[] = [
   /^http:\/\/localhost:\d+$/,
   'https://personnel-management-sys-b9278.web.app',
   'https://personnel-management-sys-b9278.firebaseapp.com',
+  'https://medsev.onrender.com',
 ];
 if (process.env.CORS_ORIGIN) {
   process.env.CORS_ORIGIN.split(',').forEach((o) => allowedOrigins.push(o.trim()));
