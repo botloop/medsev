@@ -259,12 +259,7 @@ export const MedicalEvalReportPage = () => {
   };
 
   const handleDownloadDataSheet = () => {
-    const colCount = 14;
-    const empty = Array(colCount).fill('');
-    const title1 = ['DATABASE MANAGEMENT - PCG Personnel Database', ...Array(colCount - 1).fill('')];
-    const title2 = ['Format for the List of Medical Evaluation Report', ...Array(colCount - 1).fill('')];
-    const blankRow = empty;
-    const headers = ['Control Nr (MM/YY0)','Control Nr','Date','Time','Rank','First Name','Middle Initial','Last Name','Age','Gender','Purpose','Physical Profile','Final Evaluation','Releasing Officer'];
+    const headers = ['Control Nr\n(MM/YY0)','Control Nr','Date','Time','Rank','First Name','Middle Initial','Last Name','Age','Gender','Purpose','Physical Profile','Final Evaluation','Releasing Officer'];
     const dbRows = reportPersonnel.map((p, idx) => [
       controlNr, idx + 1, fmtDate(reportDate), reportTime || '—',
       p.rank, p.firstName, p.middleName?.charAt(0).toUpperCase() || '',
@@ -276,14 +271,31 @@ export const MedicalEvalReportPage = () => {
       e.rank, e.firstName, e.middleInitial, e.lastName,
       e.age, e.gender, e.purpose, e.physProfile, doctor, releasingOfficer
     ]);
-    const csv = [title1, title2, blankRow, headers, ...dbRows, ...manualRows]
-      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const allRows = [...dbRows, ...manualRows];
+    const thStyle = 'border:1px solid #999;padding:4px 6px;background:#f0f0f0;font-weight:bold;color:#1565c0;text-align:center;white-space:pre-line;vertical-align:middle;';
+    const tdStyle = (center = false) => `border:1px solid #ccc;padding:3px 6px;${center ? 'text-align:center;' : ''}`;
+    const centerCols = new Set([0,1,2,3,6,8,9,10,11]);
+    const html = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>MedEval</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+</head><body>
+<table style="border-collapse:collapse;font-family:Arial;font-size:11px;">
+  <tr><td colspan="${headers.length}" style="font-weight:bold;font-size:13px;">DATABASE MANAGEMENT - PCG Personnel Database</td></tr>
+  <tr><td colspan="${headers.length}" style="color:#1565c0;font-size:11px;">Format for the List of Medical Evaluation Report</td></tr>
+  <tr><td colspan="${headers.length}"></td></tr>
+  <tr>${headers.map(h => `<th style="${thStyle}">${h.replace('\n','<br>')}</th>`).join('')}</tr>
+  ${allRows.map((row, ri) => `<tr style="background:${ri % 2 === 0 ? '#fff' : '#fafafa'};">${
+    row.map((v, ci) => `<td style="${tdStyle(centerCols.has(ci))}" x:str="${v}">${v}</td>`).join('')
+  }</tr>`).join('')}
+</table></body></html>`;
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `MedEval_${MONTHS[filterMonth - 1]}_${filterYear}.csv`;
+    a.download = `MedEval_${MONTHS[filterMonth - 1]}_${filterYear}.xls`;
     a.click();
     URL.revokeObjectURL(url);
   };
