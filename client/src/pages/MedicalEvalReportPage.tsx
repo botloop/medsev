@@ -30,6 +30,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AddIcon from '@mui/icons-material/Add';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import DownloadIcon from '@mui/icons-material/Download';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { toast } from 'react-hot-toast';
 
 const MANUAL_STORAGE_KEY = 'medEval_manualEntries';
@@ -229,6 +230,27 @@ export const MedicalEvalReportPage = () => {
   const handleSaveDataSheet = () => {
     localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(manualEntries));
     toast.success('Data sheet saved');
+  };
+
+  const handleCopyToClipboard = () => {
+    const headers = ['Control Nr','#','Date','Time','Rank','First Name','MI','Last Name','Age','Gender','Purpose','Physical Profile','Final Evaluation','Releasing Officer'];
+    const dbRows = reportPersonnel.map((p, idx) => [
+      controlNr, idx + 1, fmtDate(reportDate), reportTime || '—',
+      p.rank, p.firstName, p.middleName?.charAt(0).toUpperCase() || '',
+      p.lastName, calcAge(p.birthdate as string), '—',
+      purpose, `P-${physProfile}`, doctor, releasingOfficer
+    ]);
+    const manualRows = manualEntries.map((e, idx) => [
+      controlNr, reportPersonnel.length + idx + 1, fmtDate(e.date), e.time || '—',
+      e.rank, e.firstName, e.middleInitial, e.lastName,
+      e.age, e.gender, e.purpose, e.physProfile, doctor, releasingOfficer
+    ]);
+    const tsv = [headers, ...dbRows, ...manualRows]
+      .map(row => row.join('\t'))
+      .join('\n');
+    navigator.clipboard.writeText(tsv)
+      .then(() => toast.success('Copied! Paste directly into Excel'))
+      .catch(() => toast.error('Copy failed'));
   };
 
   const handleDownloadDataSheet = () => {
@@ -503,7 +525,7 @@ export const MedicalEvalReportPage = () => {
                   <MenuItem value="P-3">P-3</MenuItem>
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+              <Grid size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, flexWrap: 'wrap' }}>
                 <Button variant="outlined" startIcon={<SaveIcon />} onClick={handleSaveDataSheet}
                   disabled={manualEntries.length === 0}>
                   Save Data Sheet
@@ -511,6 +533,10 @@ export const MedicalEvalReportPage = () => {
                 <Button variant="outlined" color="success" startIcon={<DownloadIcon />} onClick={handleDownloadDataSheet}
                   disabled={totalRows === 0}>
                   Download Data Sheet
+                </Button>
+                <Button variant="outlined" color="info" startIcon={<ContentCopyIcon />} onClick={handleCopyToClipboard}
+                  disabled={totalRows === 0}>
+                  Copy for Excel
                 </Button>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddEntry}>
                   Add to Report
