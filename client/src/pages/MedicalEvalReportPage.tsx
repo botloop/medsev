@@ -29,7 +29,10 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import AddIcon from '@mui/icons-material/Add';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
+import DownloadIcon from '@mui/icons-material/Download';
 import { toast } from 'react-hot-toast';
+
+const MANUAL_STORAGE_KEY = 'medEval_manualEntries';
 
 const PURPOSES = ['Reenlistment','Schooling','Promotion','CAD','Re-Entry','Lateral Entry'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -155,12 +158,15 @@ export const MedicalEvalReportPage = () => {
   // Manual memo paste
   const [memoText, setMemoText]       = useState('');
   const [draft, setDraft]             = useState<ManualEntry>(emptyEntry());
-  const [manualEntries, setManualEntries] = useState<ManualEntry[]>([]);
+  const [manualEntries, setManualEntries] = useState<ManualEntry[]>(() => {
+    try { return JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEY) || '[]'); }
+    catch { return []; }
+  });
 
   // Report config
   const [purpose, setPurpose]               = useState('Reenlistment');
-  const [doctor, setDoctor]                 = useState(() => localStorage.getItem('medEval_doctor') ?? '');
-  const [releasingOfficer, setReleasingOfficer] = useState(() => localStorage.getItem('medEval_releasingOfficer') ?? '');
+  const [doctor, setDoctor]                 = useState(() => localStorage.getItem('medEval_doctor') ?? 'CAPT IGNACIO MC PCG');
+  const [releasingOfficer, setReleasingOfficer] = useState(() => localStorage.getItem('medEval_releasingOfficer') ?? 'LTJG CAV BORBE PCG');
   const [reportDate, setReportDate]         = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -218,6 +224,36 @@ export const MedicalEvalReportPage = () => {
 
   const removeManualEntry = (id: string) => {
     setManualEntries(prev => prev.filter(e => e.id !== id));
+  };
+
+  const handleSaveDataSheet = () => {
+    localStorage.setItem(MANUAL_STORAGE_KEY, JSON.stringify(manualEntries));
+    toast.success('Data sheet saved');
+  };
+
+  const handleDownloadDataSheet = () => {
+    const headers = ['Control Nr','#','Date','Time','Rank','First Name','MI','Last Name','Age','Gender','Purpose','Physical Profile','Final Evaluation','Releasing Officer'];
+    const dbRows = reportPersonnel.map((p, idx) => [
+      controlNr, idx + 1, fmtDate(reportDate), reportTime || '—',
+      p.rank, p.firstName, p.middleName?.charAt(0).toUpperCase() || '',
+      p.lastName, calcAge(p.birthdate as string), '—',
+      purpose, `P-${physProfile}`, doctor, releasingOfficer
+    ]);
+    const manualRows = manualEntries.map((e, idx) => [
+      controlNr, reportPersonnel.length + idx + 1, fmtDate(e.date), e.time || '—',
+      e.rank, e.firstName, e.middleInitial, e.lastName,
+      e.age, e.gender, e.purpose, e.physProfile, doctor, releasingOfficer
+    ]);
+    const csv = [headers, ...dbRows, ...manualRows]
+      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `MedEval_${MONTHS[filterMonth - 1]}_${filterYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSaveReport = async () => {
@@ -467,7 +503,15 @@ export const MedicalEvalReportPage = () => {
                   <MenuItem value="P-3">P-3</MenuItem>
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Grid size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                <Button variant="outlined" startIcon={<SaveIcon />} onClick={handleSaveDataSheet}
+                  disabled={manualEntries.length === 0}>
+                  Save Data Sheet
+                </Button>
+                <Button variant="outlined" color="success" startIcon={<DownloadIcon />} onClick={handleDownloadDataSheet}
+                  disabled={totalRows === 0}>
+                  Download Data Sheet
+                </Button>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={handleAddEntry}>
                   Add to Report
                 </Button>
