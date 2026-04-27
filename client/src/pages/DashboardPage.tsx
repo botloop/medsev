@@ -19,6 +19,7 @@ import { MedEvalSummaryReportPage } from './MedEvalSummaryReportPage';
 import { NewUserProfilePage } from './NewUserProfilePage';
 import { EditProfilePage } from './EditProfilePage';
 import { PCRPage } from './PCRPage';
+import { MRRReportPage } from './MRRReportPage';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import Box from '@mui/material/Box';
@@ -68,7 +69,7 @@ import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 
 const DRAWER_WIDTH = 240;
 const APP_VERSION = 'V 1.0.0';
-type TabId = 'overview'|'personnel'|'activity'|'messages'|'supplies'|'calendar'|'sitrep'|'readiness'|'assets'|'users'|'recycle-bin'|'med-eval-report'|'med-eval-summary'|'about'|'edit-profile'|'pcr';
+type TabId = 'overview'|'personnel'|'activity'|'messages'|'supplies'|'calendar'|'sitrep'|'readiness'|'assets'|'users'|'recycle-bin'|'med-eval-report'|'med-eval-summary'|'about'|'edit-profile'|'pcr'|'mrr-report';
 
 export const DashboardPage = () => {
   const { user, logout, refreshUser } = useAuth();
@@ -122,6 +123,7 @@ export const DashboardPage = () => {
       { id:'med-eval-summary', label:'Med Eval Summary', icon:<AssignmentIcon />,      viewerHide:true,  adminOnly:false },
       { id:'readiness',        label:'Readiness',        icon:<HealthAndSafetyIcon />, viewerHide:true,  adminOnly:false },
       { id:'pcr',              label:'PCR / Emergency',  icon:<LocalHospitalIcon />,   viewerHide:true,  adminOnly:false },
+      { id:'mrr-report',       label:'MRR Report',       icon:<ArticleIcon />,          viewerHide:true,  adminOnly:false },
     ]},
     { label:'Operations', items: [
       { id:'calendar', label:'Calendar', icon:<CalendarMonthIcon />, viewerHide:true, adminOnly:true },
@@ -466,6 +468,7 @@ export const DashboardPage = () => {
           {activeTab==='med-eval-summary' && user?.role!=='viewer' && <MedEvalSummaryReportPage />}
           {activeTab==='edit-profile'      && user?.role==='viewer' && <EditProfilePage />}
           {activeTab==='pcr'              && user?.role!=='viewer' && <PCRPage />}
+          {activeTab==='mrr-report'      && user?.role!=='viewer' && <MRRReportPage />}
           {activeTab==='messages'         && <ChatPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
           {activeTab==='about'            && <AboutPage />}
         </Box>
