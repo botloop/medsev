@@ -1,0 +1,12 @@
+.git
+.gitignore
+**/node_modules
+**/dist
+client/src
+client/public
+*.md
+.env*
+storage.rules
+firestore.rules
+firebase.json
+.firebaserc
