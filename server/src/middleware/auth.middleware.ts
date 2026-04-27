@@ -7,6 +7,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import type { JWTPayload } from '../../../shared/types/auth.types.js';
 
+const JWT_SECRET = process.env.JWT_SECRET || 'pcg-personnel-system-super-secret-jwt-key-2026-change-in-production';
+
 // Extend Express Request to include user
 declare global {
   namespace Express {
@@ -33,7 +35,7 @@ export const authMiddleware = async (
     const token = authHeader.replace('Bearer ', '');
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
 
     // Attach user to request
     req.user = decoded;

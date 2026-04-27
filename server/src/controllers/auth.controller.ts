@@ -6,6 +6,8 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { auth, db } from '../config/firebase-admin.js';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'pcg-personnel-system-super-secret-jwt-key-2026-change-in-production';
 import type { User, JWTPayload, LoginResponse } from '../../../shared/types/auth.types.js';
 import { getRolePermissions } from '../../../shared/constants/permissions.js';
 import { createActivityLog } from '../services/activityLog.service.js';
@@ -151,7 +153,7 @@ export const loginWithGoogle = async (req: Request, res: Response): Promise<void
       permissions: user.permissions
     };
 
-    const token = jwt.sign(jwtPayload, process.env.JWT_SECRET!, {
+    const token = jwt.sign(jwtPayload, JWT_SECRET, {
       expiresIn: (process.env.JWT_EXPIRE || '24h') as any
     });
 
@@ -226,7 +228,7 @@ export const loginWithSerial = async (req: Request, res: Response): Promise<void
       permissions: user.permissions
     };
 
-    const token = jwt.sign(jwtPayload, process.env.JWT_SECRET!, {
+    const token = jwt.sign(jwtPayload, JWT_SECRET, {
       expiresIn: (process.env.JWT_EXPIRE || '24h') as any
     });
 
@@ -291,7 +293,7 @@ export const loginWithPassword = async (req: Request, res: Response): Promise<vo
 
     const token = jwt.sign(
       { uid: user.uid, email: user.email, displayName: user.displayName, role: user.role, permissions: user.permissions } as JWTPayload,
-      process.env.JWT_SECRET!,
+      JWT_SECRET,
       { expiresIn: (process.env.JWT_EXPIRE || '24h') as any }
     );
 
@@ -363,7 +365,7 @@ export const refreshToken = async (req: Request, res: Response): Promise<void> =
       permissions: user.permissions
     };
 
-    const token = jwt.sign(jwtPayload, process.env.JWT_SECRET!, {
+    const token = jwt.sign(jwtPayload, JWT_SECRET, {
       expiresIn: (process.env.JWT_EXPIRE || '24h') as any
     });
 

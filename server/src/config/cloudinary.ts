@@ -8,9 +8,9 @@ import type { UploadApiOptions } from 'cloudinary';
 import { Readable } from 'stream';
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'djxbkf1q7',
+  api_key:    process.env.CLOUDINARY_API_KEY    || '513285557498239',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'Cfqx4HLGAu0nDATkHXut__8Q6j8',
   secure: true,
 });
 

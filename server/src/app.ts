@@ -18,7 +18,11 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS configuration — CORS_ORIGIN may be comma-separated for multiple allowed origins
-const allowedOrigins: (string | RegExp)[] = [/^http:\/\/localhost:\d+$/];
+const allowedOrigins: (string | RegExp)[] = [
+  /^http:\/\/localhost:\d+$/,
+  'https://personnel-management-sys-b9278.web.app',
+  'https://personnel-management-sys-b9278.firebaseapp.com',
+];
 if (process.env.CORS_ORIGIN) {
   process.env.CORS_ORIGIN.split(',').forEach((o) => allowedOrigins.push(o.trim()));
 }
