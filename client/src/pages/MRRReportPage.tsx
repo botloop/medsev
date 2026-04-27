@@ -175,6 +175,52 @@ function getCounts(
   return result;
 }
 
+// ─── Sentence construction ───────────────────────────────────────────────────
+
+const SPELL = [
+  '','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN',
+  'ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN',
+  'EIGHTEEN','NINETEEN','TWENTY','TWENTY-ONE','TWENTY-TWO','TWENTY-THREE',
+  'TWENTY-FOUR','TWENTY-FIVE','TWENTY-SIX','TWENTY-SEVEN','TWENTY-EIGHT',
+  'TWENTY-NINE','THIRTY','THIRTY-ONE',
+];
+
+function spellDays(n: number): string { return SPELL[n] || String(n); }
+
+const STATUS_TEXT: Record<StatusType, string> = {
+  ASG:      'ASSIGNED',
+  RNR:      'REST AND RECREATION',
+  SCHOOLING:'SCHOOLING',
+  TDY:      'TEMPORARY DUTY',
+  CONF:     'CONFINEMENT',
+  AWOL:     'ABSENCE WITHOUT LEAVE',
+};
+
+function constructSentence(e: PersonnelEntry): string {
+  const name = [e.firstName, e.middleInitial, e.lastName].filter(Boolean).join(' ') || '___';
+  const pcn  = e.pcn || '______';
+
+  if (!e.dateFrom || !e.dateTo) {
+    return `${e.rank} ${name} ${pcn} IS ON ${STATUS_TEXT[e.status]}`;
+  }
+
+  const from = new Date(e.dateFrom + 'T00:00:00');
+  const to   = new Date(e.dateTo   + 'T00:00:00');
+  const days = Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+  const fromDay = from.getDate();
+  const toDay   = to.getDate();
+  const fromMon = MONTHS[from.getMonth()];
+  const toMon   = MONTHS[to.getMonth()];
+  const toYr    = to.getFullYear();
+
+  const dateRange = fromMon === toMon
+    ? `${fromDay}-${toDay} ${fromMon} ${toYr}`
+    : `${fromDay} ${fromMon} - ${toDay} ${toMon} ${toYr}`;
+
+  return `${e.rank} ${name} ${pcn} GRANTED ${spellDays(days)} (${days}) DAYS ${STATUS_TEXT[e.status]} EFFECTIVE ${dateRange}`;
+}
+
 // ─── Excel HTML generation ────────────────────────────────────────────────────
 
 /** Build one <td> cell */
@@ -232,6 +278,17 @@ function buildReportRows(
     td(UNIT.service, { cs:4, left:true }),
   );
   rows.push(td(`STATION OR LOCATION: ${UNIT.location}`, { cs:C, left:true }));
+
+  // Constructed sentences — personnel on special status active on this specific day
+  const dateStr = `${year}-${String(monthIdx + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  const activeSentences = entries
+    .filter(e => e.status !== 'ASG' && e.dateFrom && e.dateTo && dateStr >= e.dateFrom && dateStr <= e.dateTo)
+    .map(constructSentence);
+  rows.push(
+    `<td colspan="${C}" style="border:1px solid #000;padding:2px 4px;text-align:left;vertical-align:top;font-family:Arial;font-size:7.5pt;word-wrap:break-word;">`+
+    `${activeSentences.join('<br>') || '&nbsp;'}</td>`,
+  );
+
   rows.push(td('&nbsp;', { cs:C }));
 
   // ── Column headers — 3 rows ──
@@ -717,23 +774,35 @@ export const MRRReportPage: React.FC = () => {
               </TableHead>
               <TableBody>
                 {entries.map(e => (
-                  <TableRow key={e.id} hover>
-                    <TableCell><b>{e.rank}</b></TableCell>
-                    <TableCell sx={{ fontFamily:'monospace' }}>
-                      {[e.lastName, e.firstName, e.middleInitial].filter(Boolean).join(', ')}
-                    </TableCell>
-                    <TableCell>{e.pcn}</TableCell>
-                    <TableCell>
-                      <Chip label={e.status} size="small" color={STATUS_COLOR[e.status]||'default'} />
-                    </TableCell>
-                    <TableCell>{fmtDate(e.dateFrom)}</TableCell>
-                    <TableCell>{fmtDate(e.dateTo)}</TableCell>
-                    <TableCell>
-                      <IconButton size="small" color="error" onClick={() => handleDelete(e.id)}>
-                        <DeleteIcon fontSize="small"/>
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
+                  <React.Fragment key={e.id}>
+                    <TableRow hover>
+                      <TableCell><b>{e.rank}</b></TableCell>
+                      <TableCell sx={{ fontFamily:'monospace' }}>
+                        {[e.lastName, e.firstName, e.middleInitial].filter(Boolean).join(', ')}
+                      </TableCell>
+                      <TableCell>{e.pcn}</TableCell>
+                      <TableCell>
+                        <Chip label={e.status} size="small" color={STATUS_COLOR[e.status]||'default'} />
+                      </TableCell>
+                      <TableCell>{fmtDate(e.dateFrom)}</TableCell>
+                      <TableCell>{fmtDate(e.dateTo)}</TableCell>
+                      <TableCell>
+                        <IconButton size="small" color="error" onClick={() => handleDelete(e.id)}>
+                          <DeleteIcon fontSize="small"/>
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                    {/* Constructed sentence preview */}
+                    {e.status !== 'ASG' && (
+                      <TableRow>
+                        <TableCell colSpan={7} sx={{ py:0.5, pl:3, bgcolor:'action.hover', borderBottom:'2px solid', borderColor:'divider' }}>
+                          <Typography variant="caption" sx={{ fontFamily:'monospace', color:'text.secondary', letterSpacing:0 }}>
+                            ↳ {constructSentence(e)}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>
