@@ -233,7 +233,7 @@ export const MedicalEvalReportPage = () => {
   };
 
   const handleCopyToClipboard = () => {
-    const headers = ['Control Nr','#','Date','Time','Rank','First Name','MI','Last Name','Age','Gender','Purpose','Physical Profile','Final Evaluation','Releasing Officer'];
+    const headers = ['Control Nr (MM/YY0)','Control Nr','Date','Time','Rank','First Name','Middle Initial','Last Name','Age','Gender','Purpose','Physical Profile','Final Evaluation','Releasing Officer'];
     const dbRows = reportPersonnel.map((p, idx) => [
       controlNr, idx + 1, fmtDate(reportDate), reportTime || '—',
       p.rank, p.firstName, p.middleName?.charAt(0).toUpperCase() || '',
@@ -245,16 +245,26 @@ export const MedicalEvalReportPage = () => {
       e.rank, e.firstName, e.middleInitial, e.lastName,
       e.age, e.gender, e.purpose, e.physProfile, doctor, releasingOfficer
     ]);
-    const tsv = [headers, ...dbRows, ...manualRows]
-      .map(row => row.join('\t'))
-      .join('\n');
+    const tsv = [
+      ['DATABASE MANAGEMENT - PCG Personnel Database'],
+      ['Format for the List of Medical Evaluation Report'],
+      [],
+      headers,
+      ...dbRows,
+      ...manualRows
+    ].map(row => row.join('\t')).join('\n');
     navigator.clipboard.writeText(tsv)
       .then(() => toast.success('Copied! Paste directly into Excel'))
       .catch(() => toast.error('Copy failed'));
   };
 
   const handleDownloadDataSheet = () => {
-    const headers = ['Control Nr','#','Date','Time','Rank','First Name','MI','Last Name','Age','Gender','Purpose','Physical Profile','Final Evaluation','Releasing Officer'];
+    const colCount = 14;
+    const empty = Array(colCount).fill('');
+    const title1 = ['DATABASE MANAGEMENT - PCG Personnel Database', ...Array(colCount - 1).fill('')];
+    const title2 = ['Format for the List of Medical Evaluation Report', ...Array(colCount - 1).fill('')];
+    const blankRow = empty;
+    const headers = ['Control Nr (MM/YY0)','Control Nr','Date','Time','Rank','First Name','Middle Initial','Last Name','Age','Gender','Purpose','Physical Profile','Final Evaluation','Releasing Officer'];
     const dbRows = reportPersonnel.map((p, idx) => [
       controlNr, idx + 1, fmtDate(reportDate), reportTime || '—',
       p.rank, p.firstName, p.middleName?.charAt(0).toUpperCase() || '',
@@ -266,10 +276,10 @@ export const MedicalEvalReportPage = () => {
       e.rank, e.firstName, e.middleInitial, e.lastName,
       e.age, e.gender, e.purpose, e.physProfile, doctor, releasingOfficer
     ]);
-    const csv = [headers, ...dbRows, ...manualRows]
+    const csv = [title1, title2, blankRow, headers, ...dbRows, ...manualRows]
       .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
       .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
