@@ -30,6 +30,7 @@ import ArticleIcon from '@mui/icons-material/Article';
 import PreviewIcon from '@mui/icons-material/Preview';
 import toast from 'react-hot-toast';
 import signatureUrl from '../assets/signature.png';
+import ExcelJS from 'exceljs';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -47,14 +48,14 @@ const STATUS_COLOR: Record<string, 'success'|'primary'|'warning'|'info'|'error'|
 };
 
 const UNIT = {
-  org:         'CGMED STATION V',
+  org:         'CGMED STATION-EV',
   parentUnit:  '',
   service:     'CGMED SERVICE',
   location:    'BLOCK 2 LOT 2 VILLA CESAR TOWNHOMES BRGY 99 DIT. TACLOBAN CITY 6500, LEYTE',
   certName:    'CAMILLE ANNE V BORBE MAC PCG',
   certGrade:   'LTJG',
   certArm:     'PCG',
-  certPosition:'NCO, CG MEDICAL STATION EASTERN VIS',
+  certPosition:'A/CO, CG MEDICAL STATION EASTERN VISAYAS',
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -390,179 +391,238 @@ function buildReportRows(
   return rows;
 }
 
-// ─── SpreadsheetML (XML) multi-sheet generation ──────────────────────────────
-// HTML-XLS <br clear="all"> does NOT create real sheets in modern Excel.
-// SpreadsheetML XML is the only reliable way to produce true multi-sheet workbooks.
-
-const ex = (s: string | number): string =>
-  String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// ─── Excel XLSX generation (ExcelJS) ─────────────────────────────────────────
 
 interface SsCell {
   v?:  string | number;
-  cs?: number;    // colspan → MergeAcross = cs-1
+  cs?: number;
   bold?: boolean;
   left?: boolean;
-  vt?:  boolean;  // rotate 90°
+  vt?:  boolean;
   wrap?: boolean;
-  big?:  boolean; // larger title font
-  sp?:   boolean; // spacer — no borders
+  big?:  boolean;
+  sp?:   boolean;
+  right?: boolean;
 }
 
-// Borders XML reused in every border-having style
-const BD = `<Borders>
- <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
- <Border ss:Position="Left"   ss:LineStyle="Continuous" ss:Weight="1"/>
- <Border ss:Position="Right"  ss:LineStyle="Continuous" ss:Weight="1"/>
- <Border ss:Position="Top"    ss:LineStyle="Continuous" ss:Weight="1"/>
-</Borders>`;
+type SsRow = { cells: SsCell[]; h?: number };
 
-const SS_STYLES = `<Styles>
-<Style ss:ID="Default"><Font ss:FontName="Arial" ss:Size="8"/></Style>
-<Style ss:ID="nc"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${BD}<Font ss:FontName="Arial" ss:Size="8"/></Style>
-<Style ss:ID="nl"><Alignment ss:Horizontal="Left"   ss:Vertical="Center"/>${BD}<Font ss:FontName="Arial" ss:Size="8"/></Style>
-<Style ss:ID="bc"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${BD}<Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>
-<Style ss:ID="bl"><Alignment ss:Horizontal="Left"   ss:Vertical="Center"/>${BD}<Font ss:FontName="Arial" ss:Size="8" ss:Bold="1"/></Style>
-<Style ss:ID="vn"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:Rotate="90"/>${BD}<Font ss:FontName="Arial" ss:Size="7"/></Style>
-<Style ss:ID="vb"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:Rotate="90"/>${BD}<Font ss:FontName="Arial" ss:Size="7" ss:Bold="1"/></Style>
-<Style ss:ID="wr"><Alignment ss:Horizontal="Left"   ss:Vertical="Top" ss:WrapText="1"/>${BD}<Font ss:FontName="Arial" ss:Size="8"/></Style>
-<Style ss:ID="tt"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/>${BD}<Font ss:FontName="Arial" ss:Size="10" ss:Bold="1"/></Style>
-<Style ss:ID="sp"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="8"/></Style>
-</Styles>`;
-
-function ssId(c: SsCell): string {
-  if (c.sp)   return 'sp';
-  if (c.big)  return 'tt';
-  if (c.vt)   return c.bold ? 'vb' : 'vn';
-  if (c.wrap) return 'wr';
-  return (c.bold ? 'b' : 'n') + (c.left ? 'l' : 'c');
+function applyStyle(cell: ExcelJS.Cell, c: SsCell): void {
+  cell.font = { name: 'Arial', size: 7, bold: !!(c.bold || c.big) };
+  const al: Partial<ExcelJS.Alignment> = {
+    horizontal: c.right ? 'right' : c.left ? 'left' : 'center',
+    vertical: 'middle',
+    wrapText: c.wrap || false,
+  };
+  if (c.vt) al.textRotation = 90;
+  cell.alignment = al as ExcelJS.Alignment;
+  if (!c.sp) {
+    cell.border = {
+      top: { style: 'thin' }, left: { style: 'thin' },
+      bottom: { style: 'thin' }, right: { style: 'thin' },
+    };
+  }
 }
 
-function ssCell(c: SsCell): string {
-  const ma  = c.cs && c.cs > 1 ? ` ss:MergeAcross="${c.cs - 1}"` : '';
-  const sid = ssId(c);
-  const val = (c.v !== undefined && c.v !== '') ? `<Data ss:Type="String">${ex(c.v)}</Data>` : '';
-  return `<Cell ss:StyleID="${sid}"${ma}>${val}</Cell>`;
+function applyRowCells(ws: ExcelJS.Worksheet, cells: SsCell[], rowIdx: number, startCol: number): void {
+  let col = startCol;
+  for (const c of cells) {
+    const span = c.cs || 1;
+    if (span > 1) ws.mergeCells(rowIdx, col, rowIdx, col + span - 1);
+    const cell = ws.getCell(rowIdx, col);
+    if (c.v !== undefined && c.v !== '') cell.value = String(c.v);
+    applyStyle(cell, c);
+    col += span;
+  }
 }
 
-function ssRow(cells: SsCell[]): string {
-  return `<Row>${cells.map(ssCell).join('')}</Row>\n`;
-}
-
-/** Build one day's morning report as rows of SsCell arrays */
+/** Build one day's morning report as rows of SsCell arrays with explicit heights */
 function buildSsRows(
   day: number, monthIdx: number, year: number,
   authorized: Record<string, number>,
   entries: PersonnelEntry[],
   endingTime: string,
-): SsCell[][] {
-  const C  = 14;
+): SsRow[] {
+  const C  = 13;
   const ct = getCounts(day, monthIdx, year, authorized, entries);
   const mn = MONTHS[monthIdx];
   const dd = String(day).padStart(2, '0');
-  const rows: SsCell[][] = [];
+  const rows: SsRow[] = [];
 
-  // Header
-  rows.push([{ v:'RESTRICTED', cs:C, bold:true }]);
-  rows.push([{ v:'', cs:C }]);
-  rows.push([{ v:'MORNING REPORT', cs:C, big:true }]);
-  rows.push([
-    { v:`ENDING: ${endingTime}`, cs:3, left:true },
-    { v:`DAY: ${dd}`, cs:3 },
-    { v:`MONTH: ${mn}`, cs:4 },
-    { v:`YEAR: ${year}`, cs:4 },
-  ]);
-  rows.push([
-    { v:`ORGANIZATION (HQ, CO, DET, ETC): ${UNIT.org}`, cs:6, left:true },
-    { v:`(PARENT UNIT): ${UNIT.parentUnit}`, cs:4, left:true },
-    { v:UNIT.service, cs:4, left:true },
-  ]);
-  rows.push([{ v:`STATION OR LOCATION: ${UNIT.location}`, cs:C, left:true }]);
+  const r = (cells: SsCell[], h?: number): SsRow => ({ cells, h });
 
-  // Sentences row — personnel on special status active on this specific day
+  // Row 1: RESTRICTED
+  rows.push(r([{ v:'RESTRICTED', cs:C, bold:true }], 14));
+
+  // Row 2: MORNING REPORT (left) + ENDING/DAY/MONTH/YEAR labels (right)
+  rows.push(r([
+    { v:'MORNING REPORT', cs:7, bold:true, left:true },
+    { v:'ENDING', cs:2, bold:true },
+    { v:'DAY',    cs:1, bold:true },
+    { v:'MONTH',  cs:2, bold:true },
+    { v:'YEAR',   cs:1, bold:true },
+  ], 22));
+
+  // Row 3: blank (wide) + ENDING/DAY/MONTH/YEAR values
+  rows.push(r([
+    { v:'', cs:7 },
+    { v:endingTime, cs:2 },
+    { v:dd },
+    { v:mn, cs:2 },
+    { v:String(year) },
+  ], 20));
+
+  // Row 4: ORGANIZATION and PARENT UNIT labels
+  rows.push(r([
+    { v:'ORGANIZATION (HQ, CO, DET, ETC)', cs:6, left:true, bold:true },
+    { v:'(PARENT UNIT)',                   cs:7, bold:true, left:true },
+  ], 16));
+
+  // Row 5: ORGANIZATION and PARENT UNIT values
+  rows.push(r([
+    { v:UNIT.org,     cs:6, left:true },
+    { v:UNIT.service, cs:7, left:true },
+  ], 20));
+
+  // Row 6: STATION OR LOCATION label
+  rows.push(r([{ v:'STATION OR LOCATION', cs:C, left:true, bold:true }], 16));
+
+  // Row 7: location value (auto-height for wrapping)
+  rows.push(r([{ v:UNIT.location, cs:C, wrap:true }]));
+
+  // Sentences row — auto-height when content, compact when empty
   const dateStr = `${year}-${String(monthIdx + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
   const sentences = entries
     .filter(e => e.status !== 'ASG' && e.dateFrom && e.dateTo && dateStr >= e.dateFrom && dateStr <= e.dateTo)
     .map(constructSentence)
     .join('\n');
-  rows.push([{ v: sentences, cs:C, left:true, wrap:true }]);
+  rows.push(r([{ v: sentences, cs:C, wrap:true }], sentences ? undefined : 16));
 
-  rows.push([{ v:'', cs:C }]);
+  // Column headers row 1: name cs:1 | PCG SN cs:1 | GRADE cs:1 | BR SVC cs:2 | DUTY MOS cs:4 | PRIMARY MOS cs:4
+  rows.push(r([
+    { v:'(LAST NAME, FIRST NAME, MI)', cs:1, wrap:true, bold:true },  // auto-height row
+    { v:'PCG SN',      cs:1, bold:true },
+    { v:'GRADE',       cs:1, bold:true },
+    { v:'BR SVC',      cs:2, bold:true },
+    { v:'DUTY MOS',    cs:4, bold:true },
+    { v:'PRIMARY MOS', cs:4, bold:true },
+  ]));
 
-  // Column headers
-  rows.push([
-    { v:'(LAST NAME, FIRST NAME, MI)', cs:1, bold:true },
-    { v:'PRESENT', cs:5, bold:true },
-    { v:'ABSENT',  cs:8, bold:true },
-  ]);
-  rows.push([
+  // Column headers row 2: blank cs:1 | PRESENT cs:4 | ABSENT cs:8
+  rows.push(r([
     { v:'' },
-    { v:'ASG', vt:true, bold:true }, { v:'DS', vt:true, bold:true },
-    { v:'TDY/DS', vt:true, bold:true }, { v:'TOTAL', vt:true, bold:true }, { v:'A/U', vt:true, bold:true },
-    { v:'FOR DUTY', vt:true, bold:true }, { v:'UNFIT', vt:true, bold:true },
-    { v:'TDY/DS', vt:true, bold:true }, { v:'RNR', vt:true, bold:true },
-    { v:'CONF', vt:true, bold:true }, { v:'FUR', vt:true, bold:true },
-    { v:'AWOL', vt:true, bold:true }, { v:'SCHOOLING', vt:true, bold:true },
-  ]);
-  rows.push([{ v:'' }, ...Array.from({length:13}, (_,i) => ({ v:`(${i+1})` }))]);
+    { v:'PRESENT', cs:4, bold:true },
+    { v:'ABSENT',  cs:8, bold:true },
+  ], 20));
+
+  // Column headers row 3: individual column labels (rotated)
+  // PRESENT (1)-(4): ASG, DS UNASD, TOTAL, A/U
+  // ABSENT  (5)-(12): FOR DUTY, NOT FOR DUTY, TDY/DS, RNR, CONF, LV/FUR, AWOL, SCHOOLING
+  rows.push(r([
+    { v:'' },
+    { v:'ASG',          vt:true, bold:true },  // (1)
+    { v:'DS UNASD',     vt:true, bold:true },  // (2)
+    { v:'TOTAL',        vt:true, bold:true },  // (3)
+    { v:'A/U',          vt:true, bold:true },  // (4)
+    { v:'FOR DUTY',     vt:true, bold:true },  // (5)
+    { v:'NOT FOR DUTY', vt:true, bold:true },  // (6)
+    { v:'TDY/DS',       vt:true, bold:true },  // (7)
+    { v:'RNR',          vt:true, bold:true },  // (8)
+    { v:'CONF',         vt:true, bold:true },  // (9)
+    { v:'LV/FUR',       vt:true, bold:true },  // (10)
+    { v:'AWOL',         vt:true, bold:true },  // (11)
+    { v:'SCHOOLING',    vt:true, bold:true },  // (12)
+  ], 105));
+
+  // Column headers row 4: (1) at col 0 above rank label, (2)–(13) over data cols
+  rows.push(r([...Array.from({length:13}, (_,i) => ({ v:`(${i+1})` }))], 16));
 
   // Data row helper
+  // col 0: rank/name label | (1)ASG | (2)DS UNASD | (3)TOTAL | (4)A/U | (5)FOR DUTY | (6)NOT FOR DUTY | (7)TDY/DS | (8)RNR | (9)CONF | (10)LV/FUR | (11)AWOL | (12)SCHOOLING
   const dRow = (label: string, c: RankCounts, bold = false): SsCell[] => {
     const has = c.auth > 0 || c.rnr > 0 || c.sch > 0 || c.tdyA > 0 || c.conf > 0 || c.awol > 0;
     return [
-      { v:label, bold, left:true },
-      { v: has ? c.asg  : '' }, { v:'' }, { v:'' },
-      { v: has ? c.totP : '' }, { v: has ? c.au : '' },
-      { v:'' }, { v:'' },
-      { v: c.tdyA || '' }, { v: c.rnr  || '' },
-      { v: c.conf || '' }, { v:'' },
-      { v: c.awol || '' }, { v: c.sch  || '' },
+      { v:label, bold, left:true },   // col 0
+      { v: has ? c.asg  : '' },       // (1) ASG
+      { v:'' },                       // (2) DS UNASD
+      { v: has ? c.totP : '' },       // (3) TOTAL
+      { v: has ? c.au   : '' },       // (4) A/U
+      { v:'' },                       // (5) FOR DUTY
+      { v:'' },                       // (6) NOT FOR DUTY
+      { v: c.tdyA || '' },            // (7) TDY/DS
+      { v: c.rnr  || '' },            // (8) RNR
+      { v: c.conf || '' },            // (9) CONF
+      { v:'' },                       // (10) LV/FUR
+      { v: c.awol || '' },            // (11) AWOL
+      { v: c.sch  || '' },            // (12) SCHOOLING
     ];
   };
 
   const sumG = (ranks: string[]): RankCounts => {
     const s: RankCounts = { auth:0,asg:0,ds:0,tdyP:0,totP:0,au:0,duty:0,utf:0,tdyA:0,rnr:0,conf:0,fur:0,awol:0,sch:0 };
-    for (const r of ranks) (Object.keys(s) as (keyof RankCounts)[]).forEach(k => { s[k] += ct[r][k]; });
+    for (const rk of ranks) (Object.keys(s) as (keyof RankCounts)[]).forEach(k => { s[k] += ct[rk][k]; });
     return s;
   };
 
-  for (const r of OFFICER_RANKS)  rows.push(dRow(r, ct[r]));
-  rows.push(dRow('TOTAL', sumG(OFFICER_RANKS), true));
-  for (const r of ENLISTED_RANKS) rows.push(dRow(r, ct[r]));
-  rows.push(dRow('TOTAL', sumG(ENLISTED_RANKS), true));
-  rows.push([{ v:'OVER', left:true }, ...Array.from({length:13}, () => ({ v:'' }))]);
-  rows.push(dRow('TOTAL', sumG(ALL_RANKS), true));
+  for (const rk of OFFICER_RANKS)  rows.push(r(dRow(rk, ct[rk]), 20));
+  rows.push(r(dRow('TOTAL', sumG(OFFICER_RANKS), true), 20));
+  for (const rk of ENLISTED_RANKS) rows.push(r(dRow(rk, ct[rk]), 20));
+  rows.push(r(dRow('TOTAL', sumG(ENLISTED_RANKS), true), 20));
+  rows.push(r([{ v:'OVER', left:true }, ...Array.from({length:12}, () => ({ v:'' }))], 16));
+  rows.push(r(dRow('TOTAL', sumG(ALL_RANKS), true), 20));
 
   // Signature block
-  rows.push([{ v:'', cs:C }]);
-  rows.push([
-    { v:'I CERTIFY THAT THIS MORNING REPORT IS CORRECT', cs:8, left:true },
+  rows.push(r([{ v:'', cs:C }], 10));
+  rows.push(r([
+    { v:'I CERTIFY THAT THIS MORNING REPORT IS CORRECT', cs:7, left:true, wrap:true },
     { v:'PAGE', cs:3 }, { v:'OF PAGES', cs:3 },
-  ]);
-  rows.push([
+  ]));
+  rows.push(r([
     { v:'SIGNATURE', cs:5, left:true },
-    { v:`NAME (TYPE OR PRINTED): ${UNIT.certName}`, cs:9, left:true },
-  ]);
-  rows.push([
-    { v:`GRADE: ${UNIT.certGrade}`, cs:3 },
-    { v:`ARM OF SERVICE: ${UNIT.certArm}`, cs:3 },
-    { v:`POSITION OR DESIGNATION: ${UNIT.certPosition}`, cs:8, left:true },
-  ]);
-  rows.push([
-    { v:'APP AGO FORM NR 1', cs:4, left:true },
-    { v:'(10 JULY 1956)', cs:5, left:true },
-    { v:'S— 87', cs:5 },
-  ]);
+    { v:'NAME: (TYPE OR PRINTED)', cs:8, left:true },
+  ]));
+  rows.push(r([
+    { v:'', cs:5 },
+    { v:UNIT.certName, cs:8, bold:true },
+  ], 50));
+  rows.push(r([
+    { v:'GRADE:', cs:3 },
+    { v:'ARM OF SERVICE:', cs:3 },
+    { v:'POSITION OR DESIGNATION:', cs:7, left:true },
+  ]));
+  rows.push(r([
+    { v:UNIT.certGrade, cs:3, bold:true },
+    { v:UNIT.certArm,   cs:3, bold:true },
+    { v:UNIT.certPosition, cs:7, left:true },
+  ]));
+  rows.push(r([
+    { v:'AFP AGO FORM NR 1', cs:4, left:true, sp:true },
+    { v:'', cs:9, sp:true },
+  ], 16));
+  rows.push(r([
+    { v:'(10 JULY 1956)', cs:4, left:true, sp:true },
+    { v:'', cs:9, sp:true },
+  ], 16));
+  rows.push(r([
+    { v:'9 ----- 187', cs:4, left:true, sp:true },
+    { v:'', cs:9, sp:true },
+  ], 16));
+  rows.push(r([
+    { v:'', cs:6 },
+    { v:'GHQ AFP COPY THRU MRU', cs:7, right:true },
+  ]));
 
   return rows;
 }
 
-/** Generate true multi-sheet SpreadsheetML workbook */
-function generateMRRExcel(
+/** Generate multi-sheet XLSX workbook with embedded signature */
+async function generateMRRExcel(
   monthIdx: number, year: number,
   authorized: Record<string, number>,
   entries: PersonnelEntry[],
   endingTime: string,
-) {
+  sigBase64: string,
+): Promise<void> {
   const monthName   = MONTHS[monthIdx];
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
 
@@ -572,58 +632,76 @@ function generateMRRExcel(
     sheetDefs.push({ name: d2 ? `${d}-${d2} ${monthName}` : `${d} ${monthName}`, day1:d, day2:d2 });
   }
 
-  // Column widths for one report (14 cols), then spacer, then second report
-  const colW = [48,18,16,16,18,18,16,16,16,18,16,16,18,20];
-  const colsXml = [
-    ...colW.map(w => `<Column ss:Width="${w}"/>`),
-    `<Column ss:Width="10"/>`,
-    ...colW.map(w => `<Column ss:Width="${w}"/>`),
-  ].join('');
+  const wb = new ExcelJS.Workbook();
 
-  const worksheetsXml = sheetDefs.map(({ name, day1, day2 }) => {
+  let sigImgId = -1;
+  let SIG_W = Math.round(100 * 96 / 72);
+  const SIG_H = Math.round(50 * 96 / 72);
+  if (sigBase64) {
+    // Determine natural dimensions to preserve aspect ratio
+    const dims = await new Promise<{ w: number; h: number }>(resolve => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 100, h: 50 });
+      img.src = sigBase64;
+    });
+    SIG_W = Math.round(SIG_H * dims.w / dims.h);
+    sigImgId = wb.addImage({
+      base64: sigBase64.replace(/^data:[^;]+;base64,/, ''),
+      extension: 'png',
+    });
+  }
+
+  const colW = [80, 38, 36, 30, 30, 32, 28, 28, 28, 30, 28, 28, 30];
+  const cw = (pt: number) => pt / 7;
+  const SIG_ROW = 46; // 0-indexed: row 0 = top padding, rows 1+ = content rows
+
+  for (const { name, day1, day2 } of sheetDefs) {
+    const ws = wb.addWorksheet(name);
+    ws.pageSetup.orientation = 'landscape';
+    ws.pageSetup.fitToPage   = true;
+    ws.pageSetup.fitToWidth  = 1;
+    ws.pageSetup.fitToHeight = 0;
+
+    // PAD | 13 Day-1 cols | separator | PAD | 13 Day-2 cols
+    ws.getColumn(1).width = cw(8);
+    colW.forEach((w, i) => { ws.getColumn(i + 2).width = cw(w); });
+    ws.getColumn(15).width = cw(14);
+    ws.getColumn(16).width = cw(8);
+    colW.forEach((w, i) => { ws.getColumn(i + 17).width = cw(w); });
+
     const rows1 = buildSsRows(day1, monthIdx, year, authorized, entries, endingTime);
     const rows2 = day2 !== null
       ? buildSsRows(day2, monthIdx, year, authorized, entries, endingTime)
       : null;
-
     const maxLen = Math.max(rows1.length, rows2 ? rows2.length : 0);
-    let tableRows = '';
+
+    ws.getRow(1).height = 6; // top padding row
     for (let i = 0; i < maxLen; i++) {
-      const r1 = rows1[i] ?? [{ v:'', cs:14 }];
-      if (rows2) {
-        const r2 = rows2[i] ?? [{ v:'', cs:14 }];
-        tableRows += ssRow([...r1, { v:'', sp:true }, ...r2]);
-      } else {
-        tableRows += ssRow(r1);
-      }
+      const r1 = rows1[i] ?? { cells: [{ v:'', cs:13 }] };
+      const r2 = rows2 ? (rows2[i] ?? { cells: [{ v:'', cs:13 }] }) : null;
+      const rowIdx = i + 2;
+      if (r1.h) ws.getRow(rowIdx).height = r1.h;
+      applyRowCells(ws, r1.cells, rowIdx, 2);
+      if (r2) applyRowCells(ws, r2.cells, rowIdx, 17);
     }
 
-    return `<Worksheet ss:Name="${ex(name)}">
-<Table>${colsXml}
-${tableRows}</Table>
-<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
- <PageSetup><Layout x:Orientation="Landscape"/></PageSetup>
- <FitToPage/>
-</WorksheetOptions>
-</Worksheet>`;
-  }).join('\n');
+    if (sigImgId >= 0) {
+      ws.addImage(sigImgId, { tl: { col: 1, row: SIG_ROW }, ext: { width: SIG_W, height: SIG_H }, editAs: 'oneCell' });
+      if (rows2) {
+        ws.addImage(sigImgId, { tl: { col: 16, row: SIG_ROW }, ext: { width: SIG_W, height: SIG_H }, editAs: 'oneCell' });
+      }
+    }
+  }
 
-  const xml =
-`<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-${SS_STYLES}
-${worksheetsXml}
-</Workbook>`;
-
-  const blob = new Blob([xml], { type:'application/vnd.ms-excel' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `MRR-${monthName}-${year}.xls`;
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob   = new Blob([buffer as ArrayBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href    = url;
+  a.download = `MRR-${monthName}-${year}.xlsx`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -757,7 +835,7 @@ export const MRRReportPage: React.FC = () => {
   };
 
   const handleDownload = () => {
-    generateMRRExcel(monthIdx, year, authorized, entries, endingTime);
+    void generateMRRExcel(monthIdx, year, authorized, entries, endingTime, sigBase64);
     toast.success('Generating workbook…');
   };
 
@@ -838,7 +916,7 @@ export const MRRReportPage: React.FC = () => {
           <Typography variant="subtitle2" fontWeight={700}>Personnel Status Entries</Typography>
           <Stack direction="row" spacing={1}>
             <Button size="small" variant={!showManual?'contained':'outlined'} startIcon={<ArticleIcon/>}
-              onClick={() => setShowManual(false)}>Paste Memo</Button>
+              onClick={() => setShowManual(false)}>Paste Status</Button>
             <Button size="small" variant={showManual?'contained':'outlined'} startIcon={<AddIcon/>}
               onClick={() => setShowManual(true)}>Manual Add</Button>
           </Stack>
@@ -854,7 +932,7 @@ export const MRRReportPage: React.FC = () => {
               SN1 LYNDON HARLIE F LIM 012544 PCG GRANTED FIFTEEN (15) DAYS REST AND RECREATION EFFECTIVE 13-27 APRIL 2026
             </Typography>
             <TextField multiline rows={4} fullWidth size="small"
-              placeholder="Paste memorandum lines here…"
+              placeholder="Paste here…"
               value={memoPaste} onChange={e => setMemoPaste(e.target.value)} sx={{ mb:1.5 }} />
             <Button variant="contained" onClick={handleParseMemo} disabled={!memoPaste.trim()}>
               Parse &amp; Add
