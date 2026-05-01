@@ -546,8 +546,8 @@ function buildSsRows(
       { v: has ? c.asg  : '' },       // (1) ASG
       { v:'' },                       // (2) DS UNASD
       { v: has ? c.totP : '' },       // (3) TOTAL
-      { v: has ? c.au   : '' },       // (4) A/U
-      { v:'' },                       // (5) FOR DUTY
+      { v:'' },                       // (4) A/U
+      { v: has ? c.au   : '' },       // (5) FOR DUTY
       { v:'' },                       // (6) NOT FOR DUTY
       { v: c.tdyA || '' },            // (7) TDY/DS
       { v: c.rnr  || '' },            // (8) RNR
@@ -575,7 +575,7 @@ function buildSsRows(
   rows.push(r([{ v:'', cs:C }], 10));
   rows.push(r([
     { v:'I CERTIFY THAT THIS MORNING REPORT IS CORRECT', cs:7, left:true, wrap:true },
-    { v:'PAGE', cs:3 }, { v:'OF PAGES', cs:3 },
+    { v:'PAGE          OF PAGES', cs:6 },
   ]));
   rows.push(r([
     { v:'SIGNATURE', cs:5, left:true },
@@ -597,7 +597,8 @@ function buildSsRows(
   ]));
   rows.push(r([
     { v:'AFP AGO FORM NR 1', cs:4, left:true, sp:true },
-    { v:'', cs:9, sp:true },
+    { v:'', cs:2, sp:true },
+    { v:'GHQ AFP COPY THRU MRU', cs:7, right:true, sp:true },
   ], 16));
   rows.push(r([
     { v:'(10 JULY 1956)', cs:4, left:true, sp:true },
@@ -607,10 +608,7 @@ function buildSsRows(
     { v:'9 ----- 187', cs:4, left:true, sp:true },
     { v:'', cs:9, sp:true },
   ], 16));
-  rows.push(r([
-    { v:'', cs:6 },
-    { v:'GHQ AFP COPY THRU MRU', cs:7, right:true },
-  ]));
+  rows.push(r([{ v:'R E S T R I C T E D', cs:C, bold:true, sp:true }], 16));
 
   return rows;
 }
