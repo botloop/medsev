@@ -51,3 +51,27 @@ export interface CreateMedicalSupplyDTO {
 export interface UpdateMedicalSupplyDTO extends Partial<CreateMedicalSupplyDTO> {
   id: string;
 }
+
+export interface DispenseRecord {
+  id: string;
+  supplyId: string;
+  supplyName: string;
+  unit: string;
+  recipientName: string;
+  recipientRank?: string;
+  quantityDispensed: number;
+  dutyPersonnel: string;
+  dispensedAt: string;   // ISO date string YYYY-MM-DD
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface CreateDispenseRecordDTO {
+  recipientName: string;
+  recipientRank?: string;
+  quantityDispensed: number;
+  dutyPersonnel: string;
+  dispensedAt: string;
+  notes?: string;
+}

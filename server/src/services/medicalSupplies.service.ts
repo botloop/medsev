@@ -4,9 +4,10 @@
  */
 
 import { db } from '../config/firebase-admin.js';
-import type { MedicalSupply, CreateMedicalSupplyDTO } from '@shared/types/medicalSupplies.types';
+import type { MedicalSupply, CreateMedicalSupplyDTO, DispenseRecord, CreateDispenseRecordDTO } from '@shared/types/medicalSupplies.types';
 
 const COLLECTION = 'medicalSupplies';
+const DISPENSE_COLLECTION = 'dispenseRecords';
 
 export const getAllSupplies = async (): Promise<MedicalSupply[]> => {
   const snapshot = await db.collection(COLLECTION).orderBy('name', 'asc').get();
@@ -58,4 +59,48 @@ export const deleteSupply = async (id: string): Promise<boolean> => {
   if (!doc.exists) return false;
   await ref.delete();
   return true;
+};
+
+export const createDispenseRecord = async (
+  supplyId: string,
+  data: CreateDispenseRecordDTO,
+  userId: string,
+  userName: string
+): Promise<DispenseRecord> => {
+  const supplyRef = db.collection(COLLECTION).doc(supplyId);
+  const supplyDoc = await supplyRef.get();
+  if (!supplyDoc.exists) throw new Error('Supply not found');
+  const supply = { id: supplyDoc.id, ...supplyDoc.data() } as MedicalSupply;
+
+  if (data.quantityDispensed <= 0) throw new Error('Quantity must be greater than 0');
+  if (data.quantityDispensed > supply.quantity) throw new Error('Insufficient stock');
+
+  const recordRef = db.collection(DISPENSE_COLLECTION).doc();
+  const now = new Date().toISOString();
+  const record: DispenseRecord = {
+    id: recordRef.id,
+    supplyId,
+    supplyName: supply.name,
+    unit: supply.unit,
+    ...data,
+    createdAt: now,
+    createdBy: userName,
+  };
+  await recordRef.set(record);
+
+  await supplyRef.update({
+    quantity: supply.quantity - data.quantityDispensed,
+    updatedAt: now,
+    updatedBy: userName,
+  });
+
+  return record;
+};
+
+export const getDispenseRecordsBySupply = async (supplyId: string): Promise<DispenseRecord[]> => {
+  const snapshot = await db.collection(DISPENSE_COLLECTION)
+    .where('supplyId', '==', supplyId)
+    .orderBy('dispensedAt', 'desc')
+    .get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DispenseRecord));
 };

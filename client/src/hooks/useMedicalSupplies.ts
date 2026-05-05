@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import api from '../services/api';
 import { toast } from 'react-hot-toast';
-import type { MedicalSupply, CreateMedicalSupplyDTO } from '@shared/types/medicalSupplies.types';
+import type { MedicalSupply, CreateMedicalSupplyDTO, DispenseRecord, CreateDispenseRecordDTO } from '@shared/types/medicalSupplies.types';
 
 export const useMedicalSupplies = () => {
   const [supplies, setSupplies] = useState<MedicalSupply[]>([]);
@@ -59,5 +59,28 @@ export const useMedicalSupplies = () => {
     }
   };
 
-  return { supplies, loading, fetchSupplies, addSupply, updateSupply, deleteSupply };
+  const dispenseSupply = async (supplyId: string, data: CreateDispenseRecordDTO): Promise<DispenseRecord | null> => {
+    try {
+      const record = await api.post(`/medical-supplies/${supplyId}/dispense`, data) as DispenseRecord;
+      setSupplies(prev => prev.map(s =>
+        s.id === supplyId ? { ...s, quantity: s.quantity - data.quantityDispensed } : s
+      ));
+      toast.success(`Dispensed ${data.quantityDispensed} to ${data.recipientName}`);
+      return record;
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to dispense supply');
+      return null;
+    }
+  };
+
+  const fetchDispenseHistory = async (supplyId: string): Promise<DispenseRecord[]> => {
+    try {
+      return await api.get(`/medical-supplies/${supplyId}/dispense`) as DispenseRecord[];
+    } catch {
+      toast.error('Failed to load dispense history');
+      return [];
+    }
+  };
+
+  return { supplies, loading, fetchSupplies, addSupply, updateSupply, deleteSupply, dispenseSupply, fetchDispenseHistory };
 };

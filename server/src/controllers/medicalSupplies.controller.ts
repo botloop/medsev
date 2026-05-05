@@ -72,6 +72,35 @@ export const update = async (req: Request, res: Response) => {
   }
 };
 
+export const dispense = async (req: Request, res: Response) => {
+  try {
+    const { uid, name } = getUser(req);
+    const record = await service.createDispenseRecord(req.params.id, req.body, uid, name);
+    await createActivityLog({
+      userId: uid,
+      userName: name,
+      action: 'update',
+      resource: 'medicalSupply',
+      resourceId: req.params.id,
+      description: `Dispensed ${record.quantityDispensed} ${record.unit} of "${record.supplyName}" to ${record.recipientName} — granted by ${record.dutyPersonnel}`,
+      metadata: { supplyId: req.params.id, dispenseRecordId: record.id },
+    });
+    return res.status(201).json(record);
+  } catch (error: any) {
+    const msg = error?.message || 'Failed to dispense supply';
+    return res.status(400).json({ error: msg });
+  }
+};
+
+export const getDispenseHistory = async (req: Request, res: Response) => {
+  try {
+    const records = await service.getDispenseRecordsBySupply(req.params.id);
+    return res.json(records);
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to fetch dispense history' });
+  }
+};
+
 export const remove = async (req: Request, res: Response) => {
   try {
     const { uid, name } = getUser(req);
